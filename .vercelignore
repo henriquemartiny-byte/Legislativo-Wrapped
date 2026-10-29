@@ -1,0 +1,5 @@
+# Ignorar pastas de processamento de dados na Vercel
+pipeline/
+.github/
+*.parquet
+*.py

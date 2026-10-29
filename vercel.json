@@ -1,8 +1,7 @@
 {
   "cleanUrls": true,
+  "outputDirectory": "web",
   "rewrites": [
-    { "source": "/", "destination": "/web/wrapped.html" },
-    { "source": "/wrapped", "destination": "/web/wrapped.html" },
-    { "source": "/wrapped.html", "destination": "/web/wrapped.html" }
+    { "source": "/", "destination": "/wrapped.html" }
   ]
 }
