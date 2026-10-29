@@ -1,0 +1,8 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/", "destination": "/web/wrapped.html" },
+    { "source": "/wrapped", "destination": "/web/wrapped.html" },
+    { "source": "/wrapped.html", "destination": "/web/wrapped.html" }
+  ]
+}
