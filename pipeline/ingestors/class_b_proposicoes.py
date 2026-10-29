@@ -147,12 +147,13 @@ def ingest_proposicoes_2025() -> dict[str, Any]:
             """
         ).pl()
 
-        # Principais projetos por deputado (Top 3 leis)
+        # Principais projetos por deputado (Top 5 leis)
         df_top_projetos = con.sql(
             """
             WITH ranked AS (
                 SELECT 
                     id_deputado,
+                    id_proposicao,
                     tipo,
                     numero,
                     ano,
@@ -167,7 +168,7 @@ def ingest_proposicoes_2025() -> dict[str, Any]:
                 FROM camara_base
                 WHERE is_lei = 1
             )
-            SELECT * FROM ranked WHERE rn <= 3
+            SELECT * FROM ranked WHERE rn <= 5
             """
         ).pl()
 
@@ -182,7 +183,7 @@ def ingest_proposicoes_2025() -> dict[str, Any]:
                     ROW_NUMBER() OVER (PARTITION BY id_deputado ORDER BY qtd_tema DESC) AS rn
                 FROM camara_temas_agg
             )
-            SELECT * FROM ranked_temas WHERE rn <= 4
+            SELECT * FROM ranked_temas WHERE rn <= 6
             """
         ).pl()
 
@@ -199,12 +200,16 @@ def ingest_proposicoes_2025() -> dict[str, Any]:
         projetos_map: dict[str, list[dict[str, Any]]] = {}
         for row in df_top_projetos.iter_rows(named=True):
             dep_id = str(row["id_deputado"])
+            id_prop = str(row.get("id_proposicao") or "")
+            url = f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={id_prop}" if id_prop else ""
             projetos_map.setdefault(dep_id, []).append({
+                "id_proposicao": id_prop,
                 "codigo": f"{row['tipo']} {row['numero']}/{row['ano']}",
                 "tipo": str(row["tipo"] or ""),
                 "ementa": str(row["ementa"] or ""),
                 "categoria": str(row["categoria"] or "ESTRUTURANTE"),
-                "situacao": str(row["situacao"] or "Em tramitação")
+                "situacao": str(row["situacao"] or "Em tramitação"),
+                "url": url,
             })
 
         # Consolidar dados da Câmara
@@ -254,12 +259,17 @@ def ingest_proposicoes_2025() -> dict[str, Any]:
                     is_lei = 1 if sigla in ["PL", "PEC", "PLP", "PDL", "PRS"] else 0
                     categoria = "SIMBÓLICO" if any(w in ementa.lower() for w in ["dia nacional", "institui o dia", "denomina", "patrono", "homenageia"]) else "ESTRUTURANTE"
 
+                    codigo_mat = m.get("Codigo", "")
+                    url_sen = m.get("UrlDetalheMateria") or f"https://www25.senado.leg.br/web/atividade/materias/-/materia/{codigo_mat}"
                     senadores_propostas.setdefault(norm_name, []).append({
+                        "id_proposicao": codigo_mat,
                         "codigo": f"{sigla} {int(numero) if numero.isdigit() else numero}/{ano}",
                         "tipo": sigla,
                         "ementa": ementa,
                         "categoria": categoria,
-                        "is_lei": is_lei
+                        "is_lei": is_lei,
+                        "situacao": "Em tramitação no Senado",
+                        "url": url_sen,
                     })
 
             for norm_name, items in senadores_propostas.items():
@@ -277,7 +287,7 @@ def ingest_proposicoes_2025() -> dict[str, Any]:
                     "pct_estruturante": pct_estrut,
                     "qtd_avancados": 0,
                     "top_temas": [],
-                    "top_projetos": leis[:3],
+                    "top_projetos": leis[:5],
                 }
 
             logger.info(f"Senado processado com sucesso: {len(results['senado_por_nome'])} senadores mapeados.")

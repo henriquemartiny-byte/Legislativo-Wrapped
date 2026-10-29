@@ -294,6 +294,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- MODAL: DETALHAMENTO DE PROJETOS, TEMAS E AUDITORIA -->
+  <div id="modal-detail" class="fixed inset-0 z-50 hidden bg-black/95 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-[#121212] border border-white/10 rounded-3xl max-w-2xl w-full p-6 md:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      <button onclick="closeModal('modal-detail')" class="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#242424] hover:bg-[#2e2e2e] flex items-center justify-center text-zinc-300 text-xs font-bold">
+        ✕
+      </button>
+      <div id="modal-detail-body"></div>
+    </div>
+  </div>
+
   <script>
     const DATA = __DATA_PAYLOAD__;
     let selectedCasa = "Câmara dos Deputados";
@@ -302,6 +312,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     
     let currentStoryParl = null;
     let currentStoryStep = 1;
+
+    let currentScopeTitle = "";
+    let currentFiltered = [];
+    let currentChampion = {};
+    let currentTopLei = {};
+    let currentTemaRecorteMap = {};
+    let currentTotalLeisRecorte = 0;
+    let currentTotalEstrutRecorte = 0;
+    let currentPctEstrut = 0;
+    let currentTopSuppliers = [];
+    let currentTopRubric = [];
+    let currentRubricMap = {};
 
     const fmtBRL = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -407,6 +429,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeModal('modal-nota');
+        closeModal('modal-detail');
         closeStories();
       }
       if (!document.getElementById('modal-stories').classList.contains('hidden')) {
@@ -711,6 +734,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         const topTema = Object.entries(temaRecorteMap).sort((a,b) => b[1] - a[1])[0] || ['Administração Pública', 0];
         const pctEstrut = totalLeisRecorte > 0 ? ((totalEstrutRecorte / totalLeisRecorte) * 100).toFixed(1) : 0;
 
+        currentChampion = c;
+        currentTopLei = topLei;
+        currentTemaRecorteMap = temaRecorteMap;
+        currentTotalLeisRecorte = totalLeisRecorte;
+        currentTotalEstrutRecorte = totalEstrutRecorte;
+        currentPctEstrut = pctEstrut;
+
         document.getElementById('cards-container').innerHTML = `
           <!-- CARD 1: Campeão de Projetos (Card Amarelo Vibrante) -->
           <div onclick="openStories('${c.nome}')" class="card-yellow rounded-[28px] p-7 flex flex-col justify-between space-y-6 cursor-pointer hover:scale-[1.01] transition-transform shadow-xl">
@@ -745,12 +775,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
           </div>
 
           <!-- CARD 2: Tema Mais Defendido (Card Roxo Elétrico) -->
-          <div class="card-purple rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl">
+          <div onclick="openTemaModal()" class="card-purple rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl cursor-pointer hover:scale-[1.01] transition-transform">
             <div class="flex items-center justify-between">
               <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-white text-[#8c52ff]">
                 BANDEIRA PRIORITÁRIA
               </span>
-              <span class="text-xs font-bold font-mono opacity-80">TEMA MAIS LEGISLADO</span>
+              <span class="text-xs font-bold font-mono opacity-90 underline">VER TODAS AS BANDEIRAS ↗</span>
             </div>
 
             <div class="space-y-1">
@@ -764,18 +794,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="text-3xl font-black tracking-tight">${topTema[1]} propostas</div>
               </div>
               <div class="text-right">
-                <div class="text-xs font-black">${totalLeisRecorte} PLs no recorte</div>
+                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white text-black text-xs font-extrabold">
+                  Explorar Pautas ↗
+                </span>
               </div>
             </div>
           </div>
 
           <!-- CARD 3: Termômetro Estruturante (Card Verde Spotify) -->
-          <div class="card-green rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl">
+          <div onclick="openTermometroModal()" class="card-green rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl cursor-pointer hover:scale-[1.01] transition-transform">
             <div class="flex items-center justify-between">
               <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-black text-[#1ed760]">
                 TERMÔMETRO LEGISLATIVO
               </span>
-              <span class="text-xs font-bold font-mono opacity-80">QUALIDADE DAS LEIS</span>
+              <span class="text-xs font-bold font-mono opacity-80 underline">AUDITORIA DE QUALIDADE ↗</span>
             </div>
 
             <div class="space-y-1">
@@ -789,18 +821,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="text-3xl font-black tracking-tight">${totalEstrutRecorte} PLs</div>
               </div>
               <div class="text-right">
-                <div class="text-xs font-black">${totalLeisRecorte - totalEstrutRecorte} projetos simbólicos</div>
+                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-black text-white text-xs font-extrabold">
+                  Ver Auditoria ↗
+                </span>
               </div>
             </div>
           </div>
 
           <!-- CARD 4: Projeto em Destaque (Card Laranja) -->
-          <div class="card-orange rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl">
+          <div onclick='openProjetoDestaqueModal()' class="card-orange rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl cursor-pointer hover:scale-[1.01] transition-transform">
             <div class="flex items-center justify-between">
               <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-black text-[#ff4632]">
                 PROJETO DESTAQUE DE 2025
               </span>
-              <span class="text-xs font-bold font-mono opacity-90">${topLei.codigo || 'PL'}</span>
+              <span class="text-xs font-bold font-mono opacity-90 underline">VER EMENTA COMPLETA ↗</span>
             </div>
 
             <div class="space-y-2">
@@ -815,7 +849,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
               </div>
               <div class="text-right">
                 <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-black text-white text-xs font-extrabold">
-                  ${topLei.categoria || 'ESTRUTURANTE'}
+                  ▶ Abrir Projeto
                 </span>
               </div>
             </div>
@@ -868,7 +902,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                       <div class="text-[10px] text-zinc-500 font-normal">${pr.qtd_total_propostas || 0} no total</div>
                     </td>
                     <td class="py-3.5 text-right max-w-xs truncate text-[11px] text-zinc-400">
-                      ${topP.codigo ? `<span class="font-bold text-white">${topP.codigo}</span>: ${topP.ementa}` : '-'}
+                      ${topP.codigo ? `
+                        <button onclick='event.stopPropagation(); openProjetoModal(${JSON.stringify(topP).replace(/'/g, "&#39;")}, ${JSON.stringify(p.nome).replace(/'/g, "&#39;")}, ${JSON.stringify(p.foto || "").replace(/'/g, "&#39;")}, ${JSON.stringify(p.partido).replace(/'/g, "&#39;")}, ${JSON.stringify(p.uf).replace(/'/g, "&#39;")})' class="text-left hover:text-[#1ed760] transition truncate w-full block">
+                          <span class="font-bold text-white">${topP.codigo}</span>: ${topP.ementa}
+                        </button>
+                      ` : '-'}
                     </td>
                   </tr>
                 `;
@@ -878,6 +916,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         `;
         return;
       }
+
+      currentChampion = c;
+      currentTopSuppliers = topSuppliers;
+      currentTopRubric = topRubric;
+      currentRubricMap = rubricMap;
 
       // Os 4 Cartões Wrapped com Cores Vivas do Spotify
       document.getElementById('cards-container').innerHTML = `
@@ -919,12 +962,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <!-- CARD 2: Empresa Favorita (Card Roxo Elétrico) -->
-        <div class="card-purple rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl">
+        <div onclick="openFornecedorModal()" class="card-purple rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl cursor-pointer hover:scale-[1.01] transition-transform">
           <div class="flex items-center justify-between">
             <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-white text-[#8c52ff]">
               FORNECEDOR FAVORITO
             </span>
-            <span class="text-xs font-bold font-mono opacity-80">MAIS CONTRATADO</span>
+            <span class="text-xs font-bold font-mono opacity-90 underline">VER FORNECEDOR ↗</span>
           </div>
 
           <div class="flex items-center gap-4">
@@ -941,19 +984,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
               <div class="text-3xl font-black tracking-tight">${fmtBRL(f.total)}</div>
             </div>
             <div class="text-right">
-              <div class="text-xs font-black">${f.notas || 0} notas emitidas</div>
-              <div class="text-xs font-extrabold text-[#1ed760]">${fornShare}% do dinheiro do grupo</div>
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white text-black text-xs font-extrabold">
+                ${fornShare}% da cota
+              </span>
             </div>
           </div>
         </div>
 
         <!-- CARD 3: Gênero Mais Ouvido (Card Verde Spotify) -->
-        <div class="card-green rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl">
+        <div onclick="openRubricaModal()" class="card-green rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl cursor-pointer hover:scale-[1.01] transition-transform">
           <div class="flex items-center justify-between">
             <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-black text-[#1ed760]">
               GÊNERO MAIS TOCADO
             </span>
-            <span class="text-xs font-bold font-mono opacity-80">CATEGORIA DE GASTO</span>
+            <span class="text-xs font-bold font-mono opacity-90 underline">VER REGULAMENTO ↗</span>
           </div>
 
           <div class="space-y-1">
@@ -967,7 +1011,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
               <div class="text-3xl font-black tracking-tight">${fmtBRL(topRubric[1])}</div>
             </div>
             <div class="text-right">
-              <div class="text-xs font-black">${rubricShare}% de todo o orçamento</div>
+              <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-black text-white text-xs font-extrabold">
+                ${rubricShare}% do total
+              </span>
             </div>
           </div>
         </div>
@@ -1414,6 +1460,403 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       });
       html += '</div>';
       container.innerHTML = html;
+    }
+
+    function getTemaEmoji(t) {
+      const l = (t || '').toLowerCase();
+      if (l.includes('saúde') || l.includes('saude')) return '🏥';
+      if (l.includes('educação') || l.includes('educacao')) return '🎓';
+      if (l.includes('economia') || l.includes('finança') || l.includes('tribut')) return '💼';
+      if (l.includes('administração') || l.includes('publica')) return '🏛️';
+      if (l.includes('agro') || l.includes('agricultura') || l.includes('pecuária')) return '🌾';
+      if (l.includes('segurança') || l.includes('penal')) return '⚖️';
+      if (l.includes('direitos humanos') || l.includes('minorias')) return '🛡️';
+      if (l.includes('meio ambiente') || l.includes('sustentável')) return '🌿';
+      if (l.includes('transporte') || l.includes('viação') || l.includes('mobilidade')) return '🚗';
+      if (l.includes('ciência') || l.includes('tecnologia') || l.includes('informática')) return '🔬';
+      if (l.includes('trabalho') || l.includes('emprego') || l.includes('previdência')) return '🛠️';
+      if (l.includes('cultura') || l.includes('esporte') || l.includes('arte')) return '🎭';
+      return '🏷️';
+    }
+
+    function openTemaModal() {
+      const modal = document.getElementById('modal-detail');
+      const body = document.getElementById('modal-detail-body');
+      if (!modal || !body) return;
+
+      const entries = Object.entries(currentTemaRecorteMap || {}).sort((a, b) => b[1] - a[1]);
+      const totalPropostas = entries.reduce((acc, it) => acc + it[1], 0);
+
+      // Amostra de projetos do tema líder no recorte
+      const sampleProjetos = [];
+      (currentFiltered || []).forEach(p => {
+        (p.propostas?.top_projetos || []).forEach(proj => {
+          if (sampleProjetos.length < 8) {
+            sampleProjetos.push({
+              ...proj,
+              autorNome: p.nome,
+              autorFoto: p.foto,
+              autorPartido: p.partido,
+              autorUF: p.uf,
+            });
+          }
+        });
+      });
+
+      body.innerHTML = `
+        <div class="space-y-6">
+          <div class="flex items-center justify-between border-b border-white/10 pb-4">
+            <div>
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-[#8c52ff] text-white">
+                DISTRIBUIÇÃO DE PAUTAS LEGISLATIVAS
+              </span>
+              <h3 class="text-2xl font-black text-white tracking-tight mt-2">Bandeiras Temáticas de 2025</h3>
+              <p class="text-xs text-zinc-400 mt-1">${currentScopeTitle}</p>
+            </div>
+          </div>
+
+          <div class="bg-[#8c52ff]/10 border border-[#8c52ff]/30 p-4 rounded-2xl text-xs text-zinc-200 leading-relaxed space-y-1">
+            <div class="font-extrabold text-[#8c52ff] text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <span>📌 Como as bandeiras são catalogadas</span>
+            </div>
+            <p>
+              Toda proposta apresentada na Câmara e no Senado é enquadrada oficialmente pelo corpo técnico legislativo em áreas temáticas. 
+              Ao analisar a bancada selecionada, mapeamos exatamente onde os parlamentares concentraram sua energia política em 2025.
+            </p>
+          </div>
+
+          <div class="space-y-3">
+            <h4 class="text-xs font-extrabold text-zinc-400 uppercase tracking-wider">
+              Ranking de Temas no Recorte (${totalPropostas} propostas)
+            </h4>
+            <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+              ${entries.map(([tema, qtd], idx) => {
+                const pct = totalPropostas > 0 ? ((qtd / totalPropostas) * 100).toFixed(1) : 0;
+                return `
+                  <div class="p-3 rounded-2xl bg-[#181818] border border-white/5 space-y-2">
+                    <div class="flex items-center justify-between text-xs font-bold">
+                      <span class="text-white flex items-center gap-2 truncate pr-2">
+                        <span class="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-mono text-zinc-400 font-bold shrink-0">${idx + 1}</span>
+                        <span class="shrink-0">${getTemaEmoji(tema)}</span>
+                        <span class="truncate">${tema}</span>
+                      </span>
+                      <span class="font-mono text-[#8c52ff] shrink-0">${qtd} propostas (${pct}%)</span>
+                    </div>
+                    <div class="h-1.5 w-full bg-black/40 rounded-full overflow-hidden">
+                      <div class="h-full bg-gradient-to-r from-[#8c52ff] to-[#1ed760] rounded-full" style="width: ${Math.min(pct * 2.5, 100)}%"></div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <div class="space-y-3 pt-2 border-t border-white/10">
+            <h4 class="text-xs font-extrabold text-zinc-400 uppercase tracking-wider">
+              Exemplos de Projetos Apresentados nesta Bancada
+            </h4>
+            <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
+              ${sampleProjetos.map(proj => `
+                <div onclick='openProjetoModal(${JSON.stringify(proj).replace(/'/g, "&#39;")}, ${JSON.stringify(proj.autorNome).replace(/'/g, "&#39;")}, ${JSON.stringify(proj.autorFoto || "").replace(/'/g, "&#39;")}, ${JSON.stringify(proj.autorPartido).replace(/'/g, "&#39;")}, ${JSON.stringify(proj.autorUF).replace(/'/g, "&#39;")})' class="p-3 rounded-2xl bg-black/40 hover:bg-black/70 border border-white/10 cursor-pointer transition text-xs space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <span class="font-black text-[#1ed760] font-mono">${proj.codigo}</span>
+                    <span class="text-[10px] text-zinc-400 font-bold">${proj.autorNome} (${proj.autorPartido}/${proj.autorUF})</span>
+                  </div>
+                  <p class="text-[11px] text-zinc-300 leading-snug line-clamp-2">${proj.ementa}</p>
+                  <div class="flex items-center justify-between pt-1">
+                    <span class="text-[9px] px-1.5 py-0.5 rounded ${proj.categoria === 'SIMBÓLICO' ? 'bg-amber-500/20 text-amber-300' : 'bg-blue-500/20 text-blue-300'} font-bold">
+                      ${proj.categoria}
+                    </span>
+                    <span class="text-[10px] font-bold text-[#8c52ff] hover:underline">Ver detalhes ↗</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    }
+
+    function openTermometroModal() {
+      const modal = document.getElementById('modal-detail');
+      const body = document.getElementById('modal-detail-body');
+      if (!modal || !body) return;
+
+      const totalLeis = currentTotalLeisRecorte || 1;
+      const totalEstrut = currentTotalEstrutRecorte || 0;
+      const totalSimb = totalLeis - totalEstrut;
+      const pctEstrut = currentPctEstrut || 0;
+      const pctSimb = (100 - pctEstrut).toFixed(1);
+
+      // Parlamentares 100% estruturantes
+      const top100Estrut = (currentFiltered || [])
+        .filter(p => (p.propostas?.qtd_projetos_lei || 0) >= 3 && (p.propostas?.pct_estruturante || 0) >= 95)
+        .sort((a, b) => (b.propostas?.qtd_estruturantes || 0) - (a.propostas?.qtd_estruturantes || 0))
+        .slice(0, 10);
+
+      // Amostra de projetos simbólicos
+      const simbolicosAmostra = [];
+      (currentFiltered || []).forEach(p => {
+        (p.propostas?.top_projetos || []).forEach(proj => {
+          if (proj.categoria === 'SIMBÓLICO' && simbolicosAmostra.length < 8) {
+            simbolicosAmostra.push({
+              ...proj,
+              autor: `${p.nome} (${p.partido}/${p.uf})`,
+            });
+          }
+        });
+      });
+
+      body.innerHTML = `
+        <div class="space-y-6">
+          <div class="flex items-center justify-between border-b border-white/10 pb-4">
+            <div>
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-[#1ed760] text-black">
+                AUDITORIA DE QUALIDADE LEGISLATIVA
+              </span>
+              <h3 class="text-2xl font-black text-white tracking-tight mt-2">Termômetro Estruturante vs. Simbólico</h3>
+              <p class="text-xs text-zinc-400 mt-1">${currentScopeTitle}</p>
+            </div>
+          </div>
+
+          <!-- Cards Comparativos Estruturante vs Simbólico -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="p-4 rounded-2xl bg-[#1ed760]/10 border border-[#1ed760]/30 space-y-1.5">
+              <div class="text-[11px] font-bold text-[#1ed760] uppercase">🏛️ Leis Estruturantes</div>
+              <div class="text-3xl font-black text-white font-mono">${pctEstrut}%</div>
+              <div class="text-xs text-zinc-300 font-medium">${totalEstrut} propostas substantivas</div>
+              <p class="text-[11px] text-zinc-400 pt-2 border-t border-white/10 leading-snug">
+                PECs, Leis Complementares e PLs que alteram o Código Penal, tributação, criam programas públicos e orçamentários.
+              </p>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-1.5">
+              <div class="text-[11px] font-bold text-amber-300 uppercase">🎗️ Projetos Simbólicos</div>
+              <div class="text-3xl font-black text-white font-mono">${pctSimb}%</div>
+              <div class="text-xs text-zinc-300 font-medium">${totalSimb} propostas de honraria</div>
+              <p class="text-[11px] text-zinc-400 pt-2 border-t border-white/10 leading-snug">
+                Criação de datas comemorativas ("Dia Nacional de..."), títulos de "Capital Nacional", patronos e nomes de rodovias.
+              </p>
+            </div>
+          </div>
+
+          <!-- Destaques Positivos: Parlamentares 100% Estruturantes -->
+          <div class="space-y-2">
+            <h4 class="text-xs font-extrabold text-[#1ed760] uppercase tracking-wider flex items-center justify-between">
+              <span>⭐ Parlamentares com Foco 100% Estruturante</span>
+              <span class="text-[10px] text-zinc-400 font-normal">Mínimo 3 PLs protocolados</span>
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+              ${top100Estrut.length > 0 ? top100Estrut.map(p => `
+                <div onclick="closeModal('modal-detail'); openStories('${p.nome}')" class="p-2.5 rounded-xl bg-[#181818] hover:bg-[#222] border border-white/5 flex items-center justify-between text-xs cursor-pointer transition">
+                  <div class="flex items-center gap-2.5 min-w-0">
+                    <img src="${p.foto}" class="w-8 h-8 rounded-full object-cover shrink-0" />
+                    <div class="truncate">
+                      <div class="font-bold text-white truncate">${p.nome}</div>
+                      <div class="text-[10px] text-zinc-400 font-mono">${p.partido} • ${p.uf}</div>
+                    </div>
+                  </div>
+                  <span class="font-mono text-[#1ed760] font-bold shrink-0">${p.propostas?.qtd_estruturantes || 0} PLs</span>
+                </div>
+              `).join('') : '<div class="text-xs text-zinc-500 col-span-2 py-3 text-center">Nenhum parlamentar com mínimo de 3 PLs e 100% estruturante neste recorte.</div>'}
+            </div>
+          </div>
+
+          <!-- Exemplos de Projetos Simbólicos -->
+          ${simbolicosAmostra.length > 0 ? `
+            <div class="space-y-2 pt-2 border-t border-white/10">
+              <h4 class="text-xs font-extrabold text-amber-300 uppercase tracking-wider">
+                Exemplos de Projetos Simbólicos / Homenagens nesta Bancada
+              </h4>
+              <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                ${simbolicosAmostra.map(s => `
+                  <div class="p-2.5 rounded-xl bg-black/40 border border-white/10 text-xs">
+                    <div class="flex items-center justify-between font-mono text-[10px] text-zinc-400">
+                      <span class="text-amber-300 font-bold">${s.codigo}</span>
+                      <span>${s.autor}</span>
+                    </div>
+                    <p class="text-[11px] text-zinc-300 mt-1 leading-snug">${s.ementa}</p>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : '<div class="text-xs text-[#1ed760] font-bold p-3 rounded-xl bg-[#1ed760]/10 border border-[#1ed760]/20 text-center">Parabéns! Nenhum projeto puramente simbólico catalogado para os parlamentares deste recorte.</div>'}
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    }
+
+    function openProjetoDestaqueModal() {
+      const c = currentChampion || {};
+      const p = currentTopLei || {};
+      openProjetoModal(p, c.nome, c.foto, c.partido, c.uf);
+    }
+
+    function openProjetoModal(proj, autorNome, autorFoto, autorPartido, autorUF) {
+      const modal = document.getElementById('modal-detail');
+      const body = document.getElementById('modal-detail-body');
+      if (!modal || !body) return;
+
+      const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(autorNome || 'P')}&background=1ed760&color=000&bold=true`;
+
+      body.innerHTML = `
+        <div class="space-y-6">
+          <div class="flex items-center justify-between border-b border-white/10 pb-4">
+            <div>
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${proj.categoria === 'SIMBÓLICO' ? 'bg-amber-500 text-black' : 'bg-[#ff4632] text-white'}">
+                ${proj.categoria || 'PROJETO ESTRUTURANTE'}
+              </span>
+              <h3 class="text-3xl font-black text-white tracking-tight mt-2">${proj.codigo}</h3>
+              <p class="text-xs text-zinc-400 font-mono mt-0.5">Status Oficial: ${proj.situacao || 'Em tramitação'}</p>
+            </div>
+          </div>
+
+          <!-- Autor do Projeto -->
+          <div class="p-4 rounded-2xl bg-[#181818] border border-white/10 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3.5 min-w-0">
+              <img src="${autorFoto || fallbackAvatar}" onerror="this.src='${fallbackAvatar}'" class="w-14 h-14 rounded-full object-cover border-2 border-[#1ed760] shrink-0" />
+              <div class="min-w-0">
+                <span class="text-[10px] font-black uppercase tracking-wider text-[#1ed760]">PRIMEIRO SIGNATÁRIO / AUTOR PRINCIPAL</span>
+                <h4 class="text-lg font-black text-white mt-0.5 truncate">${autorNome}</h4>
+                <p class="text-xs text-zinc-400 font-mono">${autorPartido} • ${autorUF}</p>
+              </div>
+            </div>
+            <button onclick="closeModal('modal-detail'); openStories('${autorNome}')" class="px-3.5 py-2 rounded-full bg-white/10 hover:bg-[#1ed760] hover:text-black text-white text-xs font-extrabold transition shrink-0">
+              Ver Stories ↗
+            </button>
+          </div>
+
+          <!-- Ementa Oficial Completa -->
+          <div class="space-y-2">
+            <h4 class="text-xs font-extrabold text-zinc-400 uppercase tracking-wider">Ementa Oficial do Projeto</h4>
+            <div class="p-5 rounded-2xl bg-black/60 border border-white/10 text-sm text-zinc-100 font-medium leading-relaxed">
+              ${proj.ementa || 'Ementa não detalhada no portal de dados abertos.'}
+            </div>
+          </div>
+
+          <!-- Botão Oficial de Tramitação -->
+          <div class="pt-2">
+            ${proj.url ? `
+              <a href="${proj.url}" target="_blank" class="w-full py-3.5 px-4 rounded-full text-center text-xs font-black bg-[#1ed760] hover:bg-[#1db954] text-black transition flex items-center justify-center gap-2 shadow-lg">
+                📄 Acessar Ficha de Tramitação no Portal da Câmara / Senado ↗
+              </a>
+            ` : '<div class="text-xs text-zinc-500 text-center font-bold">Link direto não fornecido pela API.</div>'}
+          </div>
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    }
+
+    function openFornecedorModal() {
+      const modal = document.getElementById('modal-detail');
+      const body = document.getElementById('modal-detail-body');
+      if (!modal || !body) return;
+
+      const f = (currentTopSuppliers && currentTopSuppliers[0]) || {};
+      const fallbackForn = `https://ui-avatars.com/api/?name=${encodeURIComponent(f.nome || 'E')}&background=8c52ff&color=fff&bold=true`;
+
+      // Parlamentares que contrataram
+      const hiringPols = (currentFiltered || [])
+        .filter(p => (p.top_fornecedores || []).some(tf => tf.cnpj === f.cnpj))
+        .map(p => {
+          const matchF = p.top_fornecedores.find(tf => tf.cnpj === f.cnpj);
+          return {
+            nome: p.nome,
+            foto: p.foto,
+            partido: p.partido,
+            uf: p.uf,
+            totalPago: matchF.total,
+            notas: matchF.notas,
+          };
+        })
+        .sort((a, b) => b.totalPago - a.totalPago);
+
+      body.innerHTML = `
+        <div class="space-y-6">
+          <div class="flex items-center justify-between border-b border-white/10 pb-4">
+            <div>
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-[#8c52ff] text-white">
+                FORNECEDOR MAIS CONTRATADO
+              </span>
+              <h3 class="text-2xl font-black text-white tracking-tight mt-2">${f.nome || 'Fornecedor Líder'}</h3>
+              <p class="text-xs text-zinc-400 font-mono mt-0.5">CNPJ: ${f.cnpj || 'Não informado'}</p>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-[#181818] border border-white/10 flex items-center justify-between">
+            <div>
+              <div class="text-xs text-zinc-400 uppercase font-bold">Total Faturado com Esta Bancada</div>
+              <div class="text-3xl font-black text-[#1ed760] font-mono mt-0.5">${fmtBRL(f.total)}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs font-bold text-white">${f.notas || 0} notas fiscais emitidas</div>
+              <div class="text-[10px] text-zinc-400 font-mono mt-0.5">${hiringPols.length} gabinetes atendidos</div>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <h4 class="text-xs font-extrabold text-zinc-400 uppercase tracking-wider">
+              Parlamentares que Mais Pagaram a Esta Empresa
+            </h4>
+            <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
+              ${hiringPols.map((p, idx) => `
+                <div onclick="closeModal('modal-detail'); openStories('${p.nome}')" class="p-3 rounded-2xl bg-black/40 hover:bg-black/60 border border-white/5 flex items-center justify-between text-xs cursor-pointer transition">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <span class="font-mono text-zinc-500 font-bold">${idx + 1}</span>
+                    <img src="${p.foto}" class="w-8 h-8 rounded-full object-cover shrink-0" />
+                    <div class="truncate">
+                      <div class="font-bold text-white truncate">${p.nome}</div>
+                      <div class="text-[10px] text-zinc-400 font-mono">${p.partido} • ${p.uf} • ${p.notas} notas</div>
+                    </div>
+                  </div>
+                  <span class="font-mono text-[#1ed760] font-black shrink-0">${fmtBRL(p.totalPago)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    }
+
+    function openRubricaModal() {
+      const modal = document.getElementById('modal-detail');
+      const body = document.getElementById('modal-detail-body');
+      if (!modal || !body) return;
+
+      const rubricaNome = (currentTopRubric && currentTopRubric[0]) || "DIVULGAÇÃO DA ATIVIDADE PARLAMENTAR";
+      const totalRubrica = (currentTopRubric && currentTopRubric[1]) || 0;
+
+      body.innerHTML = `
+        <div class="space-y-6">
+          <div class="flex items-center justify-between border-b border-white/10 pb-4">
+            <div>
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-[#1ed760] text-black">
+                CATEGORIA DE GASTO LÍDER
+              </span>
+              <h3 class="text-2xl font-black text-white tracking-tight mt-2">${rubricaNome}</h3>
+              <p class="text-xs text-zinc-400 mt-1">${currentScopeTitle}</p>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-[#181818] border border-white/10">
+            <div class="text-xs text-zinc-400 uppercase font-bold">Volume Total Reembolsado nesta Categoria</div>
+            <div class="text-3xl font-black text-[#1ed760] font-mono mt-0.5">${fmtBRL(totalRubrica)}</div>
+          </div>
+
+          <div class="bg-white/5 border border-white/10 p-4 rounded-2xl text-xs text-zinc-300 leading-relaxed space-y-2">
+            <h4 class="font-black text-white uppercase text-xs">⚖️ O que diz o Regulamento da Cota</h4>
+            <p>
+              Os recursos da CEAP/CEAPS destinam-se exclusivamente ao custeio de despesas vinculadas ao exercício do mandato parlamentar, tais como divulgação, assessoria, transporte e escritórios.
+            </p>
+            <p class="text-zinc-400 text-[11px]">
+              O Ato da Mesa veda expressamente a contratação de serviços sem comprovação material ou vinculados a campanhas político-eleitorais partidárias.
+            </p>
+          </div>
+        </div>
+      `;
+      modal.classList.remove('hidden');
     }
 
     initFilters();
