@@ -344,6 +344,18 @@ def build_wrapped_dataset() -> dict:
                 "genero_favorito": top_rubrica_dict,
             }
 
+    # Carrega dados oficiais de Proposições e Atividade Legislativa 2025
+    prop_path = GOLD_DIR / "proposicoes_2025.json"
+    proposicoes_data = {}
+    if prop_path.exists():
+        try:
+            proposicoes_data = json.loads(prop_path.read_text(encoding="utf-8"))
+            print(f"Dados oficiais de proposições carregados: {len(proposicoes_data.get('camara_por_id', {}))} deputados, {len(proposicoes_data.get('senado_por_nome', {}))} senadores.")
+        except Exception as e:
+            print(f"Aviso ao carregar proposições: {e}")
+    camara_props = proposicoes_data.get("camara_por_id", {})
+    senado_props = proposicoes_data.get("senado_por_nome", {})
+
     # 3. Dossiê completo individual de cada um dos 645 parlamentares
     all_parls = con.execute(
         """
@@ -458,6 +470,30 @@ def build_wrapped_dataset() -> dict:
 
         custo_total_mandato = round(tot + custo_eq + subsidio + (51036.00 if is_titular else 0), 2)
 
+        # Proposições e Produção Legislativa 2025
+        prop_item = None
+        if casa == "Câmara dos Deputados":
+            prop_item = camara_props.get(str(pid))
+        else:
+            prop_item = senado_props.get(norm_nome)
+            if not prop_item:
+                for k, v in senado_props.items():
+                    if k in norm_nome or norm_nome in k:
+                        prop_item = v
+                        break
+
+        if not prop_item:
+            prop_item = {
+                "qtd_total_propostas": 0,
+                "qtd_projetos_lei": 0,
+                "qtd_estruturantes": 0,
+                "qtd_simbolicos": 0,
+                "pct_estruturante": 0.0,
+                "qtd_avancados": 0,
+                "top_temas": [],
+                "top_projetos": [],
+            }
+
         parl_roster.append(
             {
                 "id": str(pid),
@@ -477,6 +513,7 @@ def build_wrapped_dataset() -> dict:
                 "custo_total_mandato": custo_total_mandato,
                 "qtd_assessores": qtd_ass,
                 "assessores": assessores[:25],
+                "propostas": prop_item,
                 "notas": n_notas,
                 "fornecedores_distintos": n_forn,
                 "maior_nota": maior_n,

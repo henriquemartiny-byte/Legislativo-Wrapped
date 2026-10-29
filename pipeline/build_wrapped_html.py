@@ -137,13 +137,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
               </button>
             </div>
 
-            <!-- Alternador de Escopo de Custo (Cota vs Total) -->
+            <!-- Alternador de Visão (Cota vs Custo Total vs Projetos de Lei) -->
             <div class="flex items-center gap-1 p-1 bg-[#181818] rounded-xl border border-white/10 text-xs">
               <button onclick="setModoCusto('cota')" id="btn-modo-cota" class="px-3 py-1.5 rounded-lg text-xs font-black transition bg-[#1ed760] text-black shadow-md">
                 ✈️ Cota (CEAP)
               </button>
               <button onclick="setModoCusto('total')" id="btn-modo-total" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-transparent text-zinc-400 hover:text-white">
-                💼 Custo Total
+                💼 Custo Gabinete
+              </button>
+              <button onclick="setModoCusto('projetos')" id="btn-modo-projetos" class="px-3 py-1.5 rounded-lg text-xs font-bold transition bg-transparent text-zinc-400 hover:text-white">
+                📜 Projetos de Lei (PLs)
               </button>
             </div>
           </div>
@@ -257,6 +260,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="h-1 flex-1 rounded-full bg-white/30 overflow-hidden"><div id="prog-2" class="h-full bg-white w-0 transition-all duration-300"></div></div>
         <div class="h-1 flex-1 rounded-full bg-white/30 overflow-hidden"><div id="prog-3" class="h-full bg-white w-0 transition-all duration-300"></div></div>
         <div class="h-1 flex-1 rounded-full bg-white/30 overflow-hidden"><div id="prog-4" class="h-full bg-white w-0 transition-all duration-300"></div></div>
+        <div class="h-1 flex-1 rounded-full bg-white/30 overflow-hidden"><div id="prog-5" class="h-full bg-white w-0 transition-all duration-300"></div></div>
       </div>
 
       <button onclick="closeStories()" class="absolute top-5 right-5 z-20 w-8 h-8 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center text-white text-xs font-bold">
@@ -269,7 +273,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <button onclick="prevStory()" class="px-4 py-2 rounded-full text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition">
           ← Anterior
         </button>
-        <span id="story-counter" class="text-xs font-mono text-white/60">1 / 4</span>
+        <span id="story-counter" class="text-xs font-mono text-white/60">1 / 5</span>
         <button onclick="nextStory()" class="px-4 py-2 rounded-full text-xs font-bold bg-white text-black hover:bg-[#1ed760] transition">
           Próximo →
         </button>
@@ -351,14 +355,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       selectedModoCusto = modo;
       const btnCota = document.getElementById('btn-modo-cota');
       const btnTotal = document.getElementById('btn-modo-total');
-      if (btnCota && btnTotal) {
-        if (modo === 'cota') {
-          btnCota.className = "px-3.5 py-1.5 rounded-lg text-xs font-black transition bg-[#1ed760] text-black shadow-md flex items-center gap-1.5";
-          btnTotal.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-transparent text-zinc-400 hover:text-white flex items-center gap-1.5";
-        } else {
-          btnCota.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-transparent text-zinc-400 hover:text-white flex items-center gap-1.5";
-          btnTotal.className = "px-3.5 py-1.5 rounded-lg text-xs font-black transition bg-[#1ed760] text-black shadow-md flex items-center gap-1.5";
-        }
+      const btnProjetos = document.getElementById('btn-modo-projetos');
+      const inact = "px-3 py-1.5 rounded-lg text-xs font-bold transition bg-transparent text-zinc-400 hover:text-white";
+      const act = "px-3 py-1.5 rounded-lg text-xs font-black transition bg-[#1ed760] text-black shadow-md";
+      if (btnCota && btnTotal && btnProjetos) {
+        btnCota.className = (modo === 'cota') ? act : inact;
+        btnTotal.className = (modo === 'total') ? act : inact;
+        btnProjetos.className = (modo === 'projetos') ? act : inact;
       }
       render();
     }
@@ -527,6 +530,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         if (selectedPartido !== 'TODOS' && p.partido !== selectedPartido) return false;
         return true;
       }).sort((a, b) => {
+        if (selectedModoCusto === 'projetos') {
+          const pA = (a.propostas && a.propostas.qtd_estruturantes) || 0;
+          const pB = (b.propostas && b.propostas.qtd_estruturantes) || 0;
+          if (pB !== pA) return pB - pA;
+          return ((b.propostas && b.propostas.qtd_projetos_lei) || 0) - ((a.propostas && a.propostas.qtd_projetos_lei) || 0);
+        }
         const valA = (selectedModoCusto === 'total') ? (a.custo_total_mandato || a.total) : a.total;
         const valB = (selectedModoCusto === 'total') ? (b.custo_total_mandato || b.total) : b.total;
         return valB - valA;
@@ -538,7 +547,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         titleScope += ` • Partido ${selectedPartido}`;
       }
       titleScope += (selectedCondicao === 'TITULAR') ? ' • [Apenas Titulares]' : ' • [Com Suplentes]';
-      titleScope += (selectedModoCusto === 'total') ? ' • [Custo Total de Gabinete]' : ' • [Cota Operacional CEAP]';
+      if (selectedModoCusto === 'projetos') {
+        titleScope += ' • [Produção de Leis (PL/PEC)]';
+      } else if (selectedModoCusto === 'total') {
+        titleScope += ' • [Custo Total de Gabinete]';
+      } else {
+        titleScope += ' • [Cota Operacional CEAP]';
+      }
       document.getElementById('ranking-title-uf').textContent = titleScope;
 
       const totalGasto = filtered.reduce((acc, p) => {
@@ -675,6 +690,194 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(c.nome || 'P')}&background=1ed760&color=000&bold=true`;
       const fallbackForn = `https://ui-avatars.com/api/?name=${encodeURIComponent(f.nome || 'E')}&background=8c52ff&color=fff&bold=true`;
       const fallbackMaior = `https://ui-avatars.com/api/?name=${encodeURIComponent(m.parlamentar || 'M')}&background=ff4632&color=fff&bold=true`;
+
+      if (selectedModoCusto === 'projetos') {
+        const cProp = c.propostas || {};
+        const cLeis = cProp.top_projetos || [];
+        const topLei = cLeis[0] || { codigo: 'PL 2025', ementa: 'Nenhum projeto registrado', categoria: 'ESTRUTURANTE', situacao: 'Em tramitação' };
+
+        // Agrega os temas do recorte
+        const temaRecorteMap = {};
+        let totalLeisRecorte = 0;
+        let totalEstrutRecorte = 0;
+        filtered.forEach(p => {
+          const pr = p.propostas || {};
+          totalLeisRecorte += (pr.qtd_projetos_lei || 0);
+          totalEstrutRecorte += (pr.qtd_estruturantes || 0);
+          (pr.top_temas || []).forEach(t => {
+            temaRecorteMap[t.tema] = (temaRecorteMap[t.tema] || 0) + t.qtd;
+          });
+        });
+        const topTema = Object.entries(temaRecorteMap).sort((a,b) => b[1] - a[1])[0] || ['Administração Pública', 0];
+        const pctEstrut = totalLeisRecorte > 0 ? ((totalEstrutRecorte / totalLeisRecorte) * 100).toFixed(1) : 0;
+
+        document.getElementById('cards-container').innerHTML = `
+          <!-- CARD 1: Campeão de Projetos (Card Amarelo Vibrante) -->
+          <div onclick="openStories('${c.nome}')" class="card-yellow rounded-[28px] p-7 flex flex-col justify-between space-y-6 cursor-pointer hover:scale-[1.01] transition-transform shadow-xl">
+            <div class="flex items-center justify-between">
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-black text-[#f6dc35]">
+                #1 MAIOR AUTOR DE PROJETOS ESTRUTURANTES
+              </span>
+              <span class="text-xs font-black tracking-wider uppercase font-mono">
+                VER STORIES ↗
+              </span>
+            </div>
+
+            <div class="flex items-center gap-5">
+              <img src="${c.foto || fallbackAvatar}" onerror="this.src='${fallbackAvatar}'" class="w-20 h-20 rounded-full object-cover border-4 border-black shadow-2xl shrink-0" alt="${c.nome || ''}" />
+              <div>
+                <span class="text-xs font-bold tracking-wider uppercase opacity-80">${c.partido || ''} • ${c.uf || ''}</span>
+                <h3 class="text-3xl font-black tracking-tight leading-tight mt-0.5">${c.nome || 'N/A'}</h3>
+              </div>
+            </div>
+
+            <div class="pt-4 border-t border-black/20 flex items-end justify-between">
+              <div>
+                <div class="text-[11px] font-bold uppercase tracking-wider opacity-75">Projetos de Lei Estruturantes (2025)</div>
+                <div class="text-3xl font-black tracking-tight">${cProp.qtd_estruturantes || 0} PLs e PECs</div>
+                <div class="text-[11px] font-black opacity-80 mt-0.5">${cProp.pct_estruturante || 0}% de foco estruturante • ${cProp.qtd_simbolicos || 0} simbólicos</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-black">${cProp.qtd_total_propostas || 0} propostas no total</div>
+                <div class="text-xs font-extrabold text-[#1ed760] font-mono">#1 do Recorte</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 2: Tema Mais Defendido (Card Roxo Elétrico) -->
+          <div class="card-purple rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl">
+            <div class="flex items-center justify-between">
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-white text-[#8c52ff]">
+                BANDEIRA PRIORITÁRIA
+              </span>
+              <span class="text-xs font-bold font-mono opacity-80">TEMA MAIS LEGISLADO</span>
+            </div>
+
+            <div class="space-y-1">
+              <div class="text-3xl font-black tracking-tight leading-tight">${topTema[0]}</div>
+              <div class="text-xs font-bold opacity-80">A pauta que mais mobilizou os parlamentares deste recorte em 2025</div>
+            </div>
+
+            <div class="pt-4 border-t border-white/20 flex items-end justify-between">
+              <div>
+                <div class="text-[11px] font-bold uppercase tracking-wider opacity-75">Volume de Propostas na Área</div>
+                <div class="text-3xl font-black tracking-tight">${topTema[1]} propostas</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-black">${totalLeisRecorte} PLs no recorte</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 3: Termômetro Estruturante (Card Verde Spotify) -->
+          <div class="card-green rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl">
+            <div class="flex items-center justify-between">
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-black text-[#1ed760]">
+                TERMÔMETRO LEGISLATIVO
+              </span>
+              <span class="text-xs font-bold font-mono opacity-80">QUALIDADE DAS LEIS</span>
+            </div>
+
+            <div class="space-y-1">
+              <div class="text-3xl font-black tracking-tight leading-tight">${pctEstrut}% Estruturantes</div>
+              <div class="text-xs font-bold opacity-80">Projetos com alteração em códigos, direitos e orçamento (contra datas/homenagens)</div>
+            </div>
+
+            <div class="pt-4 border-t border-black/20 flex items-end justify-between">
+              <div>
+                <div class="text-[11px] font-bold uppercase tracking-wider opacity-75">Total de Projetos Estruturantes</div>
+                <div class="text-3xl font-black tracking-tight">${totalEstrutRecorte} PLs</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-black">${totalLeisRecorte - totalEstrutRecorte} projetos simbólicos</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 4: Projeto em Destaque (Card Laranja) -->
+          <div class="card-orange rounded-[28px] p-7 flex flex-col justify-between space-y-6 shadow-xl">
+            <div class="flex items-center justify-between">
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-black text-[#ff4632]">
+                PROJETO DESTAQUE DE 2025
+              </span>
+              <span class="text-xs font-bold font-mono opacity-90">${topLei.codigo || 'PL'}</span>
+            </div>
+
+            <div class="space-y-2">
+              <div class="text-xs font-bold uppercase tracking-wider opacity-90">Autor: ${c.nome} (${c.partido}/${c.uf})</div>
+              <p class="text-sm font-extrabold line-clamp-3 leading-snug">${topLei.ementa || ''}</p>
+            </div>
+
+            <div class="pt-4 border-t border-black/20 flex items-end justify-between">
+              <div>
+                <div class="text-[10px] font-bold uppercase tracking-wider opacity-75">Tramitação Atual</div>
+                <div class="text-sm font-black">${topLei.situacao || 'Em tramitação'}</div>
+              </div>
+              <div class="text-right">
+                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-black text-white text-xs font-extrabold">
+                  ${topLei.categoria || 'ESTRUTURANTE'}
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Tabela no modo Projetos de Lei
+        document.getElementById('podio-table').innerHTML = `
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-white/10 text-zinc-500 font-extrabold uppercase tracking-wider text-[11px]">
+                <th class="py-3 pr-4 w-12">#</th>
+                <th class="py-3 pr-4">Parlamentar</th>
+                <th class="py-3 pr-4 text-center">Foco Estruturante</th>
+                <th class="py-3 pr-4">Bandeiras Temáticas</th>
+                <th class="py-3 pr-4 text-right">Projetos de Lei</th>
+                <th class="py-3 text-right">Projeto em Destaque (2025)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5">
+              ${filtered.map((p, idx) => {
+                const pr = p.propostas || {};
+                const leis = pr.top_projetos || [];
+                const topP = leis[0] || {};
+                return `
+                  <tr onclick="openStories('${p.nome}')" class="group hover:bg-[#181818] cursor-pointer transition">
+                    <td class="py-3.5 pr-4 font-mono font-bold text-zinc-500 group-hover:text-[#1ed760]">
+                      ${idx + 1}
+                    </td>
+                    <td class="py-3.5 pr-4 flex items-center gap-3">
+                      <img src="${p.foto || fallbackAvatar}" onerror="this.src='${fallbackAvatar}'" class="w-10 h-10 rounded-full object-cover border border-white/10" alt="${p.nome}" />
+                      <div>
+                        <div class="font-extrabold text-white text-sm group-hover:text-[#1ed760] transition">${p.nome}</div>
+                        <div class="text-[10px] text-zinc-400 font-mono">${p.partido} • ${p.uf} • ${p.condicao}</div>
+                      </div>
+                    </td>
+                    <td class="py-3.5 pr-4 text-center font-mono">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-black ${(pr.pct_estruturante || 0) >= 80 ? 'bg-[#1ed760]/20 text-[#1ed760]' : 'bg-yellow-500/20 text-yellow-300'}">
+                        ${pr.pct_estruturante || 0}% Estruturante
+                      </span>
+                      <div class="text-[9px] text-zinc-500 mt-0.5">${pr.qtd_simbolicos || 0} datas/homenagens</div>
+                    </td>
+                    <td class="py-3.5 pr-4">
+                      <div class="flex flex-wrap gap-1">
+                        ${(pr.top_temas || []).slice(0, 2).map(t => `<span class="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] text-zinc-300">${t.tema} (${t.qtd})</span>`).join('') || '<span class="text-zinc-600 text-[10px]">-</span>'}
+                      </div>
+                    </td>
+                    <td class="py-3.5 pr-4 text-right font-mono font-black text-sm">
+                      <div class="text-[#1ed760]">${pr.qtd_estruturantes || 0} PLs</div>
+                      <div class="text-[10px] text-zinc-500 font-normal">${pr.qtd_total_propostas || 0} no total</div>
+                    </td>
+                    <td class="py-3.5 text-right max-w-xs truncate text-[11px] text-zinc-400">
+                      ${topP.codigo ? `<span class="font-bold text-white">${topP.codigo}</span>: ${topP.ementa}` : '-'}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+        return;
+      }
 
       // Os 4 Cartões Wrapped com Cores Vivas do Spotify
       document.getElementById('cards-container').innerHTML = `
@@ -893,7 +1096,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     }
 
     function nextStory() {
-      if (currentStoryStep < 4) {
+      if (currentStoryStep < 5) {
         currentStoryStep++;
         renderStorySlide();
       } else {
@@ -912,12 +1115,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       const p = currentStoryParl;
       const wrap = document.getElementById('story-card-wrapper');
       const content = document.getElementById('story-content');
-      document.getElementById('story-counter').textContent = `${currentStoryStep} / 4`;
+      document.getElementById('story-counter').textContent = `${currentStoryStep} / 5`;
 
       document.getElementById('prog-1').style.width = currentStoryStep >= 1 ? '100%' : '0%';
       document.getElementById('prog-2').style.width = currentStoryStep >= 2 ? '100%' : '0%';
       document.getElementById('prog-3').style.width = currentStoryStep >= 3 ? '100%' : '0%';
       document.getElementById('prog-4').style.width = currentStoryStep >= 4 ? '100%' : '0%';
+      document.getElementById('prog-5').style.width = currentStoryStep >= 5 ? '100%' : '0%';
 
       const fallbackFoto = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.nome)}&background=1ed760&color=000&bold=true`;
 
@@ -1031,7 +1235,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </p>
           </div>
         `;
-      } else {
+      } else if (currentStoryStep === 4) {
         const atipicas = p.notas_atipicas || [];
         wrap.className = "relative w-full max-w-md h-[680px] rounded-[32px] overflow-hidden flex flex-col justify-between p-7 shadow-2xl border border-white/20 card-orange text-white";
         content.innerHTML = `
@@ -1060,6 +1264,55 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             <p class="text-[11px] text-orange-200 text-center">
               Clique em qualquer nota acima para abrir o diagnóstico forense detalhado.
+            </p>
+          </div>
+        `;
+      } else {
+        const prop = p.propostas || {};
+        const leis = prop.top_projetos || [];
+        const temas = prop.top_temas || [];
+        wrap.className = "relative w-full max-w-md h-[680px] rounded-[32px] overflow-hidden flex flex-col justify-between p-7 shadow-2xl border border-white/20 bg-gradient-to-br from-[#0a192f] via-[#112240] to-[#1e3a8a] text-white";
+        content.innerHTML = `
+          <div class="space-y-3.5 my-auto text-left">
+            <div class="text-center">
+              <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-[#1ed760] text-black">
+                5. DNA LEGISLATIVO & PROJETOS
+              </span>
+              <h2 class="text-2xl font-black tracking-tight mt-2">${prop.qtd_projetos_lei || 0} Projetos de Lei Apresentados</h2>
+              <p class="text-xs text-zinc-300 mt-0.5">${prop.pct_estruturante || 0}% de Foco Estruturante (${prop.qtd_estruturantes || 0} PLs e PECs)</p>
+            </div>
+
+            <!-- Principais Bandeiras Temáticas -->
+            <div class="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1.5">
+              <div class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Top Bandeiras do Mandato (2025)</div>
+              <div class="flex flex-wrap gap-1.5">
+                ${temas.length > 0 ? temas.map(t => `
+                  <span class="px-2 py-1 rounded-lg bg-white/10 text-xs font-extrabold text-[#1ed760] flex items-center gap-1">
+                    🏷️ ${t.tema} <span class="text-zinc-400 font-mono text-[10px]">(${t.qtd})</span>
+                  </span>
+                `).join('') : '<span class="text-xs text-zinc-400">Nenhum tema prioritário catalogado</span>'}
+              </div>
+            </div>
+
+            <!-- Principais Projetos Apresentados -->
+            <div class="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+              <div class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Projetos em Destaque</div>
+              ${leis.length > 0 ? leis.map(l => `
+                <div class="p-2.5 rounded-xl bg-black/50 border border-white/10 text-xs space-y-1">
+                  <div class="flex items-center justify-between">
+                    <span class="font-extrabold text-[#1ed760] font-mono">${l.codigo}</span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded ${l.categoria === 'SIMBÓLICO' ? 'bg-yellow-500/20 text-yellow-300' : 'bg-blue-500/20 text-blue-300'} font-bold">
+                      ${l.categoria}
+                    </span>
+                  </div>
+                  <p class="text-[11px] text-zinc-200 line-clamp-3 leading-snug">${l.ementa}</p>
+                  <div class="text-[9px] text-zinc-400 font-mono">Status: ${l.situacao || 'Em tramitação'}</div>
+                </div>
+              `).join('') : '<div class="text-xs text-zinc-400 text-center py-4 bg-black/30 rounded-xl">Nenhum projeto de lei principal protocolado como autor em 2025.</div>'}
+            </div>
+
+            <p class="text-[10px] text-zinc-400 text-center">
+              Fonte oficial: Dados Abertos e Legislação da ${p.casa}.
             </p>
           </div>
         `;
@@ -1146,7 +1399,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
               <div class="min-w-0">
                 <span class="text-[10px] font-black uppercase tracking-wider text-[#1ed760]">${match.casa === 'Senado Federal' ? 'Senador' : 'Deputado'} • ${match.uf} • <span class="bg-white/10 px-1 py-0.2 rounded text-white">${match.partido}</span></span>
                 <h4 class="text-sm font-black text-white mt-0.5 truncate group-hover:text-[#1ed760] transition">${match.nome}</h4>
-                <p class="text-[11px] text-zinc-400 mt-0.5 font-mono">${match.notas} notas • ${match.outliers_z3 || 0} atípicas</p>
+                <p class="text-[11px] text-zinc-400 mt-0.5 font-mono">${match.notas} notas • ${(match.propostas && match.propostas.qtd_projetos_lei) || 0} PLs • ${match.outliers_z3 || 0} atípicas</p>
               </div>
             </div>
             <div class="text-right shrink-0">
