@@ -1,0 +1,22 @@
+# Ignorar dados brutos temporários (garantia dupla além da exclusão automática)
+pipeline/storage/bronze/
+pipeline/storage/silver/
+*.duckdb
+*.duckdb.wal
+tmp/
+.tmp_ingest/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.uv/
+.env
+.env.local
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
